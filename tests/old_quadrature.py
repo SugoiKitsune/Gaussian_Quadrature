@@ -1,6 +1,164 @@
 import numpy as np
-from scipy.special import gamma
+from scipy.special import gamma, binom
 import jax.numpy as jnp
+from functools import lru_cache
+
+def get_laguerre_coefficients(n):
+    """
+    Generate the coefficients of the nth Laguerre polynomial in explicit form.
+    
+    The Laguerre polynomial L_n(x) can be written as:
+    L_n(x) = sum_{k=0}^{n} binom(n,k) * (-1)^k / k! * x^k
+    
+    Parameters:
+    n : int
+        Degree of the Laguerre polynomial
+        
+    Returns:
+    list
+        List of coefficients [a_0, a_1, ..., a_n] where L_n(x) = a_0 + a_1*x + ... + a_n*x^n
+    """
+    coeffs = np.zeros(n + 1)
+    
+    for k in range(n + 1):
+        # Calculate coefficient for x^k term: binom(n,k) * (-1)^k / k!
+        coeff = binom(n, k) * ((-1) ** k) / np.math.factorial(k)
+        coeffs[k] = coeff
+    
+    return coeffs
+
+def laguerre_polynomial(n, x, alpha=0.0):
+    """
+    Implementation of generalized Laguerre polynomials.
+    
+    For standard Laguerre polynomials (alpha=0), uses the explicit formula:
+    L_n(x) = sum_{k=0}^{n} binom(n,k) * (-1)^k / k! * x^k
+    
+    Parameters:
+    n : int
+        Degree of the polynomial
+    x : array_like
+        Points at which to evaluate the polynomial
+    alpha : float, optional
+        Parameter for generalized Laguerre polynomials
+        
+    Returns:
+    array_like
+        Laguerre polynomial values at x
+    """
+    x = jnp.asarray(x)
+    
+    if alpha == 0.0:
+        # For standard Laguerre polynomials, use the explicit coefficient formula
+        if n == 0:
+            return jnp.ones_like(x)
+        elif n == 1:
+            return 1.0 - x
+        else:
+            # Use explicit formula based on coefficients
+            coeffs = get_laguerre_coefficients(n)
+            result = jnp.zeros_like(x)
+            for k, coeff in enumerate(coeffs):
+                result = result + coeff * x**k
+            return result
+    else:
+        # For generalized Laguerre polynomials (alpha ≠ 0), use recurrence relation
+        if n == 0:
+            return jnp.ones_like(x)
+        elif n == 1:
+            return 1 + alpha - x
+        else:
+            L_prev = jnp.ones_like(x)
+            L_curr = 1 + alpha - x
+            
+            for k in range(1, n):
+                L_next = ((2*k + 1 + alpha - x) * L_curr - (k + alpha) * L_prev) / (k + 1)
+                L_prev = L_curr
+                L_curr = L_next
+                
+            return L_curr
+
+def print_laguerre_polynomial(n):
+    """
+    Print the nth Laguerre polynomial in human-readable form.
+    Shows both the standard form (with computed coefficients) and
+    the symbolic factorial representation.
+    
+    Parameters:
+    n : int
+        Degree of the Laguerre polynomial
+        
+    Returns:
+    str
+        String representation of the Laguerre polynomial
+    """
+    if n < 0:
+        return "Invalid degree: n must be non-negative"
+    
+    # Standard form with computed coefficients
+    coeffs = get_laguerre_coefficients(n)
+    
+    # Format the standard polynomial form
+    terms = []
+    for k in range(n, -1, -1):  # Start from highest power
+        coeff = coeffs[k]
+        if abs(coeff) < 1e-10:  # Skip terms with extremely small coefficients
+            continue
+            
+        # Format standard form coefficient
+        if k == 0:  # Constant term
+            terms.append(f"{coeff:.10g}")
+        elif k == 1:  # Linear term
+            if abs(coeff - 1) < 1e-10:
+                terms.append("x")
+            elif abs(coeff + 1) < 1e-10:
+                terms.append("-x")
+            else:
+                terms.append(f"{coeff:.10g}*x")
+        else:  # Higher order terms
+            if abs(coeff - 1) < 1e-10:
+                terms.append(f"x^{k}")
+            elif abs(coeff + 1) < 1e-10:
+                terms.append(f"-x^{k}")
+            else:
+                terms.append(f"{coeff:.10g}*x^{k}")
+    
+    if not terms:
+        return "0"
+    
+    # Format the full standard form with appropriate signs
+    result = terms[0]
+    for term in terms[1:]:
+        if term[0] == '-':
+            result += " " + term
+        else:
+            result += " + " + term
+    
+    # Instead of manipulating coefficients, just show the mathematical formula for factorial form
+    # This is L_n(x) = sum_{k=0}^n (-1)^k/k! * binom(n,k) * x^k
+    if n <= 5:  # Only do the full expansion for small n to keep output readable
+        factorial_form = "("
+        factorial_terms = []
+        
+        for k in range(n, -1, -1):
+            sign = "+" if k % 2 == 0 else "-"
+            if k == 0:
+                coefficient = f"{binom(n, k):.0f}"
+            else:
+                coefficient = f"{binom(n, k):.0f}*x^{k}"
+                
+            # Skip the + sign for the first term
+            if k == n:
+                factorial_terms.append(f"{'-' if sign == '-' else ''}{coefficient}")
+            else:
+                factorial_terms.append(f"{sign} {coefficient}")
+                
+        factorial_form += " ".join(factorial_terms) + ")"
+    else:
+        # For higher degrees, use summation notation
+        factorial_form = "(Σ_{k=0}^{n} (-1)^k*binom(n,k)*x^k/k!)"
+    
+    return f"L_{n}(x) = {result}\n       = 1/{n}! * {factorial_form}"
 
 def laguerre_function_final(n, x, alpha=0.0):
     """
