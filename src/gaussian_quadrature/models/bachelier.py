@@ -6,7 +6,8 @@ import jax
 import jax.numpy as jnp
 from ..utils.transforms import compute_transformed_strike
 from ..utils.stats import standard_normal_cdf, standard_normal_pdf
-from ..utils.quadrature import generalized_laguerre_quadrature
+# Remove direct import to break circular dependency
+# We'll use lazy import inside functions that need it
 
 
 def dF(x, tau, K, Rt, v, PtT):
@@ -54,6 +55,9 @@ def bachelier_caplet_price_laguerre(tau, K, Rt, v, PtT, n_points=20):
     n_points : int
         Number of quadrature points (default: 20)
     """
+    # Import inside the function to avoid circular dependency
+    from ..utils.quadrature import generalized_laguerre_quadrature
+    
     # Use alpha=1 for better convergence with caplet payoff structure
     caplet_value = generalized_laguerre_quadrature(
         lambda x: f(x, tau, K, Rt, v, PtT), 

@@ -3,7 +3,6 @@ Utility functions for numerical computations
 """
 
 from .quadrature import (
-    generalized_laguerre_quadrature,
     laguerre_function_final,
     compute_gauss_laguerre_points_final
 )
